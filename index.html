@@ -87,10 +87,13 @@
 
                     output.innerHTML += `<br><br><strong style="color:blue;">[系統提示] 準備跳轉至 Google 搜尋：${keyword}...</strong>`;
 
-                    // 稍微延遲讓使用者看到提示後跳轉
-                    setTimeout(() => {
-                        window.location.href = searchUrl;
-                    }, 1000);
+                    // 嘗試直接開啟新分頁（不使用 setTimeout，減少被阻擋的機率）
+                    const newWindow = window.open(searchUrl, "_blank");
+
+                    // 檢查是否被瀏覽器阻擋 (Popup Blocker)
+                    if (!newWindow || newWindow.closed || typeof newWindow.closed == "undefined") {
+                        output.innerHTML += `<br><strong style="color:red;">⚠️ 彈出視窗被瀏覽器阻擋了！請 <a href="${searchUrl}" target="_blank" style="color:blue; text-decoration:underline;">點擊此處手動開啟搜尋結果</a>，或在網址列允許此網站的彈出視窗。</strong>`;
+                    }
                 }
 
                 startBtn.addEventListener("click", () => {
