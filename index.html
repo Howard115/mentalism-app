@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>關鍵字觸發停止錄音 Demo</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        #output { padding: 15px; background: #f4f4f4; min-height: 50px; border-left: 5px solid #007bff; margin-top: 10px; }
+        .keyword { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>關鍵字自動停止錄音</h1>
+    <p>提示：設定的停止關鍵字為：<span class="keyword">「停止」</span>或<span class="keyword">「可以了」</span></p>
+    
+    <button id="start-btn">開始監聽</button>
+    <button id="stop-btn" disabled>手動停止</button>
+    <div id="output">點擊「開始監聽」並對著麥克風說話...</div>
+
+    <script>
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            document.getElementById('output').innerText = "您的瀏覽器不支援 Web Speech API。";
+        } else {
+            const recognition = new SpeechRecognition();
+            
+            // 關鍵設定：開啟連續辨識與即時暫時結果
+            recognition.continuous = true;
+            recognition.interimResults = true; 
+            recognition.lang = 'zh-TW'; // 設定為台灣中文
+
+            // 定義觸發停止的關鍵字清單
+            const STOP_KEYWORDS = ['停止', '可以了', '閉嘴', '不要錄了'];
+
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const output = document.getElementById('output');
+
+            startBtn.addEventListener('click', () => {
+                recognition.start();
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                output.innerHTML = "正在聆聽中，請說話...";
+            });
+
+            stopBtn.addEventListener('click', () => {
+                recognition.stop();
+            });
+
+            // 語音辨識事件處理
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                let shouldStop = false;
+
+                // 處理所有回傳的辨識結果
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcriptSegment = event.results[i][0].transcript.trim();
+                    
+                    // 即時檢查該片段是否包含任何一個停止關鍵字
+                    const hasKeyword = STOP_KEYWORDS.some(keyword => transcriptSegment.includes(keyword));
+                    
+                    if (hasKeyword) {
+                        shouldStop = true;
+                    }
+
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcriptSegment;
+                    } else {
+                        interimTranscript += transcriptSegment;
+                    }
+                }
+
+                // 更新介面文字
+                output.innerHTML = `<strong>最終結果:</strong> ${finalTranscript} <br>
+                                    <span style="color:gray;">即時比對: ${interimTranscript}</span>`;
+
+                // 核心邏輯：一旦偵測到關鍵字，直接停止錄音
+                if (shouldStop) {
+                    output.innerHTML += `<br><br><strong style="color:red;">[系統提示] 偵測到關鍵字，已自動停止錄音！</strong>`;
+                    recognition.stop(); // 觸發停止
+                }
+            };
+
+            // 監聽停止事件，重設按鈕狀態
+            recognition.onend = () => {
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            };
+
+            recognition.onerror = (event) => {
+                output.innerText = `發生錯誤: ${event.error}`;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            };
+        }
+    </script>
+</body>
+</html>
