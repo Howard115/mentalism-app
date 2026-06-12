@@ -61,7 +61,7 @@
                 recognition.lang = "zh-TW"; // 設定為台灣中文
 
                 // 定義觸發停止的關鍵字清單
-                const STOP_KEYWORDS = ["停止", "可以了", "閉嘴", "不要錄了"];
+                const STOP_KEYWORDS = ["停止", "沒有動"];
 
                 const startBtn = document.getElementById("start-btn");
                 const stopBtn = document.getElementById("stop-btn");
@@ -69,34 +69,44 @@
                 const historyContent = document.getElementById("history-content");
 
                 let allHistory = "";
+                let isRedirecting = false;
 
-                function executeRedirect() {
-                    // 先過濾掉我們排版用的逗號，取得真實純文字
+                async function executeRedirect() {
+                    if (isRedirecting) return;
+                    isRedirecting = true;
+
                     const cleanHistory = allHistory.replace(/，/g, "").trim();
+                    output.innerHTML += `<br><br><strong style="color:blue;">[系統提示] 正在進行心靈感應 (AI 推理中)...</strong>`;
 
-                    // 取倒數 10 到倒數 5 字
-                    let keyword = cleanHistory.slice(-10, -5);
+                    try {
+                        const response = await fetch("/api/predict", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ history: cleanHistory }),
+                        });
 
-                    // 防呆：如果說的話不夠長，就拿剩下的全部，或者給個預設值
-                    if (!keyword) {
-                        keyword = cleanHistory || "圖片";
-                    }
+                        const data = await response.json();
+                        if (data.error) throw new Error(data.error);
 
-                    const searchQuery = encodeURIComponent(keyword);
-                    const searchUrl = `https://www.google.com/search?q=${searchQuery}&udm=2`;
+                        const searchKeyword = data.search_keyword;
+                        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchKeyword)}&udm=2`;
 
-                    output.innerHTML += `<br><br><strong style="color:blue;">[系統提示] 準備跳轉至 Google 搜尋：${keyword}...</strong>`;
+                        window.location.href = searchUrl;
+                    } catch (error) {
+                        console.error("推理失敗", error);
+                        const fallbackKeyword =
+                            cleanHistory
+                                .slice(-10)
+                                .replace(/我的手機.*|沒有動.*|停止.*/g, "")
+                                .trim() || "圖片";
+                        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(fallbackKeyword)}&udm=2`;
 
-                    // 嘗試直接開啟新分頁（不使用 setTimeout，減少被阻擋的機率）
-                    const newWindow = window.open(searchUrl, "_blank");
-
-                    // 檢查是否被瀏覽器阻擋 (Popup Blocker)
-                    if (!newWindow || newWindow.closed || typeof newWindow.closed == "undefined") {
-                        output.innerHTML += `<br><strong style="color:red;">⚠️ 彈出視窗被瀏覽器阻擋了！請 <a href="${searchUrl}" target="_blank" style="color:blue; text-decoration:underline;">點擊此處手動開啟搜尋結果</a>，或在網址列允許此網站的彈出視窗。</strong>`;
+                        window.location.href = searchUrl;
                     }
                 }
 
                 startBtn.addEventListener("click", () => {
+                    isRedirecting = false;
                     recognition.start();
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
